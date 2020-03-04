@@ -1,0 +1,30 @@
+name: Build Container
+on: [push]
+
+jobs:
+  build-and-push:
+    env:
+      REPO : ${{github.repository}}
+      USERNAME: ${{github.repository#*/}} | tr '[:upper:]' '[:lower:]'
+      REF: ${{github.ref}}
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: Create VARS
+      id: vars
+      run: | 
+        echo "::set-output name=branch::${github.ref##*/}"
+
+    - name: Build the Docker image
+      run: |
+        docker build -t $USERNAME:${{ steps.vars.outputs.branch }} -t $REPO:${{ steps.vars.outputs.branch }}-${{github.sha}} .       
+
+    - name: Login to registry
+      env:
+        DOCKER_USERNAME: $USERNAME
+        DOCKER_PASSWORD: ${{ secrets.DOCKER_HUB_PASSWORD }}
+      run: echo $DOCKER_PASSWORD | docker login -u $DOCKER_USERNAME --password-stdin
+      
+    - name: Pushes the Docker image
+      if: github.event_name != 'pull_request' && contains(github.ref, 'actions') != 'true'
+      run: docker push $REPO
